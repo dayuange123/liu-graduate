@@ -18,4 +18,6 @@ public interface EnvironmentDao extends JpaRepository<Environment, Integer> {
 
     Environment findByEmailAndAreaAndName(String email, String area, String name);
 
+    int countByEmail(String email);
+
 }

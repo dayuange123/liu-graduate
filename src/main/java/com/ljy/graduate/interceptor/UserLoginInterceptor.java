@@ -33,7 +33,7 @@ public class UserLoginInterceptor implements HandlerInterceptor {
         }
         //直接重定向到登录页面
 		log.info("------------user not login---------");
-        response.sendRedirect(request.getContextPath() + "/me/lyear_pages_login.html");
+        response.sendRedirect(request.getContextPath() + "/me/login.html");
         return false;
 
     }

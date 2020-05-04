@@ -16,6 +16,8 @@ public interface DeviceService {
 
     Response<List<DeviceVO>> getAllDevice(String email);
 
+    Integer getDeviceCount(String email);
+
     void deleteDevice(String email, Integer id);
 
 }

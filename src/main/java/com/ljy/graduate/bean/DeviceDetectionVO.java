@@ -29,7 +29,8 @@ public class DeviceDetectionVO {
 
     private String reportThreshold;
 
-    private  String nameAndArea;
+    private  String name;
+    private  String area;
     /**
      * 0 安全
      */

@@ -17,6 +17,7 @@ import javax.mail.MessagingException;
 import java.util.Date;
 
 import static com.ljy.graduate.common.ResponseMessage.*;
+import static com.ljy.graduate.util.Constants.HOST_PORT;
 
 /**
  * Author: liuzhiyuan
@@ -120,6 +121,6 @@ public class UserServiceImpl implements UserService {
 
     public String getEmailContent(String email) {
         return
-            "亲爱的用户：<br/>感谢您在我站注册了新帐号。<br/><br/><a href='http://localhost:8080/user/activateUser?email=" + email + "'target= _blank'>请点击链接激活您的帐号</a><br/> 如果以上链接无法点击，请将它复制到你的浏览器地址栏中进入访问，该链接24小时内有效。";
+            "亲爱的用户：<br/>感谢您在我站注册了新帐号。<br/><br/><a href='http://"+HOST_PORT+"/user/activateUser?email=" + email + " 'target= _blank'>请点击链接激活您的帐号</a><br/> 如果以上链接无法点击，请将它复制到你的浏览器地址栏中进入访问，该链接24小时内有效。";
     }
 }

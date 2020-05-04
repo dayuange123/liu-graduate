@@ -110,13 +110,13 @@ public class UserController {
     public void quitLogin(@CookieValue("email") String email, HttpServletResponse response, HttpServletRequest request) throws IOException {
         log.info("1233");
         if (email == null) {
-            response.sendRedirect(request.getContextPath() + "/me/lyear_pages_login.html");
+            response.sendRedirect(request.getContextPath() + "/me/login.html");
         }
 
         Cookie cookie = new Cookie("email", null);
         cookie.setPath("/");
         cookie.setMaxAge(0);
         response.addCookie(cookie);
-        response.sendRedirect(request.getContextPath() + "/me/lyear_pages_login.html");
+        response.sendRedirect(request.getContextPath() + "/me/login.html");
     }
 }

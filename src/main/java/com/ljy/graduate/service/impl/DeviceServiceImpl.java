@@ -49,6 +49,11 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     @Override
+    public Integer getDeviceCount(String email) {
+        return deviceDao.countByEmail(email);
+    }
+
+    @Override
     public void deleteDevice(String email, Integer id) {
         deviceDao.deleteById(id);
     }

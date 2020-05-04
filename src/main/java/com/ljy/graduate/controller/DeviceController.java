@@ -49,6 +49,7 @@ public class DeviceController {
         }
     }
 
+
     @RequestMapping(value = "/deleteDevice", method = RequestMethod.GET)
     public void deleteDevice(@CookieValue("email") String email, Integer id, HttpServletResponse response, HttpServletRequest request) {
         try {

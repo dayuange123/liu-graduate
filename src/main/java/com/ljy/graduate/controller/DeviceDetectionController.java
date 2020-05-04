@@ -25,6 +25,7 @@ public class DeviceDetectionController {
 
     @Resource(name = "deviceDetectionService")
     private DeviceDetectionService deviceDetectionService;
+
     @RequestMapping(value = "/getAllDeviceData", method = RequestMethod.POST)
     public Response<List<DeviceDetectionVO>> getAllDeviceData(@CookieValue("email") String email) {
         try {

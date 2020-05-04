@@ -7,18 +7,25 @@ import com.ljy.graduate.dao.EnvironmentDao;
 import com.ljy.graduate.dao.RedisDao;
 import com.ljy.graduate.dao.UserDao;
 import com.ljy.graduate.entity.Environment;
+import com.ljy.graduate.entity.EnvironmentHistory;
 import com.ljy.graduate.entity.User;
 import com.ljy.graduate.service.EnvironmentDetectionService;
+import com.ljy.graduate.service.EnvironmentHistoryService;
+import com.ljy.graduate.service.MailService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import javax.mail.MessagingException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+
+import static com.ljy.graduate.util.Constants.UserConstants.ALARM_MAIL_ENVIRONMENT_CONTENT;
+import static com.ljy.graduate.util.Constants.UserConstants.ALARM_MAIL_TITLE;
 
 /**
  * Author: liuzhiyuan
@@ -39,8 +46,17 @@ public class EnvironmentDetectionServiceImpl implements EnvironmentDetectionServ
     @Resource(name = "userDao")
     private UserDao userDao;
 
-
     private SimpleDateFormat format = new SimpleDateFormat("yyy-MM-dd HH:mm:ss");
+    @Resource(name = "mailService")
+    private MailService mailService;
+
+    private ConcurrentHashMap<Integer, Integer> alarmMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, Integer> reportMap = new ConcurrentHashMap<>();
+
+    @Resource(name = "environmentHistoryService")
+    private EnvironmentHistoryService environmentHistoryService;
+
+    private ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     /**
      * 初始化数据值
@@ -71,8 +87,7 @@ public class EnvironmentDetectionServiceImpl implements EnvironmentDetectionServ
         return new Response<>(detectionFromRedis);
     }
 
-
-    public void changeEnvironmentData() {
+    public void changeEnvironmentData() throws MessagingException {
         List<String> emailList = userDao.findAll().stream().map(User::getEmail).collect(Collectors.toList());
         for (String email : emailList) {
             List<Environment> environments = environmentDao.findAllByEmail(email);
@@ -83,7 +98,7 @@ public class EnvironmentDetectionServiceImpl implements EnvironmentDetectionServ
         }
     }
 
-    private void changeCore(List<Environment> environments, String email) {
+    private void changeCore(List<Environment> environments, String email) throws MessagingException {
         List<EnvironmentDetectionVO> newData = new ArrayList<>();
         String oldDataStr = redisDao.getEnvironmentDataByEmail(email);
         if (oldDataStr == null || oldDataStr.equals("")) {
@@ -109,7 +124,7 @@ public class EnvironmentDetectionServiceImpl implements EnvironmentDetectionServ
             Random random = new Random();
             if (random.nextInt(10) == 5) {
                 //超过阈值
-                newDatum.setCurrent((random.nextInt() % normal)/10 + reportThreshold);
+                newDatum.setCurrent((random.nextInt() % normal) / 10 + reportThreshold);
             } else {
                 if (current == null || current == 0d) {
                     newDatum.setCurrent(normal);
@@ -122,13 +137,33 @@ public class EnvironmentDetectionServiceImpl implements EnvironmentDetectionServ
                 }
             }
             newDatum.setIsError(newDatum.getCurrent() > reportThreshold);
-            newDatum.setUpdateTime(format.format(System.currentTimeMillis()));
-            if(newDatum.getIsError()){
-                //TODO 发送短信告知
-            }
-            //TODO 上报统计历史
+            newDatum.setUpdateTime(format.format(new Date().getTime()));
+            doAlarm(newDatum, email);
+            doReport(newDatum, email);
+
         }
         updateEnvironmentData(email, newData);
+    }
+
+    private void doReport(EnvironmentDetectionVO newDatum, String email) {
+        Integer val = reportMap.getOrDefault(newDatum.getId(), 0);
+        if (val % 10 == 0) {
+            environmentHistoryService.addData(buildHistory(newDatum, email));
+        }
+        reportMap.put(newDatum.getId(), val + 1);
+    }
+
+
+    private EnvironmentHistory buildHistory(EnvironmentDetectionVO environmentDetectionVO, String email) {
+
+        return EnvironmentHistory.builder()
+            .area(environmentDetectionVO.getArea())
+            .createTime(new Date())
+            .email(email)
+            .updateTime(environmentDetectionVO.getUpdateTime())
+            .name(environmentDetectionVO.getName())
+            .current(environmentDetectionVO.getCurrent())
+            .status(environmentDetectionVO.getIsError() ? 0 : 1).build();
     }
 
     /**
@@ -138,5 +173,27 @@ public class EnvironmentDetectionServiceImpl implements EnvironmentDetectionServ
         String string = JSON.toJSON(environmentVOS).toString();
         log.info("update environment data={}", string);
         redisDao.setEnvironmentDataByEmail(email, string);
+    }
+
+
+    private void doAlarm(EnvironmentDetectionVO detectionVO, String email) throws MessagingException {
+        if (detectionVO.getIsError()) {
+            Integer val = alarmMap.getOrDefault(detectionVO.getId(), 0);
+            if (val % 20 == 0) {
+                mailService.sendAlarmMail(email, ALARM_MAIL_TITLE, buildAlarmContent(detectionVO));
+            }
+            alarmMap.put(detectionVO.getId(), val + 1);
+            log.info("alarm val={}", val);
+        } else {
+            alarmMap.remove(detectionVO.getId());
+        }
+
+    }
+
+    private String buildAlarmContent(EnvironmentDetectionVO detectionVO) {
+        return ALARM_MAIL_ENVIRONMENT_CONTENT + "\n设备名:" + detectionVO.getName() + "\n" +
+            "设备区域:" + detectionVO.getArea() + "\n" +
+            "设备当前值:" + detectionVO.getCurrent() + "\n" +
+            "设备报警阈值:" + detectionVO.getReportThreshold() + "\n";
     }
 }

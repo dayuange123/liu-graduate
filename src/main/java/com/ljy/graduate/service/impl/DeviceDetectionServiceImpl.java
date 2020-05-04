@@ -6,17 +6,28 @@ import com.ljy.graduate.common.Response;
 import com.ljy.graduate.dao.DeviceDao;
 import com.ljy.graduate.dao.RedisDao;
 import com.ljy.graduate.entity.Device;
+import com.ljy.graduate.entity.DeviceHistory;
 import com.ljy.graduate.service.DeviceDetectionService;
+import com.ljy.graduate.service.DeviceHistoryService;
+import com.ljy.graduate.service.MailService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import javax.mail.MessagingException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+
+import static com.ljy.graduate.util.Constants.UserConstants.ALARM_MAIL_DEVICE_CONTENT;
+import static com.ljy.graduate.util.Constants.UserConstants.ALARM_MAIL_TITLE;
 
 /**
  * Author: liuzhiyuan
@@ -31,21 +42,28 @@ public class DeviceDetectionServiceImpl implements DeviceDetectionService {
     @Resource(name = "deviceDao")
     private DeviceDao deviceDao;
 
-
     @Resource(name = "redisDao")
     private RedisDao redisDao;
     private SimpleDateFormat format = new SimpleDateFormat("yyy-MM-dd HH:mm:ss");
 
+    @Resource(name = "deviceHistoryService")
+    private DeviceHistoryService deviceHistoryService;
+
+    @Resource(name = "mailService")
+    private MailService mailService;
+
+    private ConcurrentHashMap<Integer, Integer> alarmMap = new ConcurrentHashMap<>();
+    private ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     private DeviceDetectionVO buildNewData(Device d) {
         return DeviceDetectionVO.builder().status(0)
             .isError(false).id(d.getId())
             .reportThreshold(d.getReportThreshold())
-            .useTime(0L).nameAndArea(d.getDeviceName() + "(" + d.getDeviceArea() + ")").build();
+            .useTime(0L).name(d.getDeviceName()).area(d.getDeviceArea()).build();
     }
 
     @Override
-    public Response<List<DeviceDetectionVO>> getAllDeviceData(String email) throws ParseException {
+    public Response<List<DeviceDetectionVO>> getAllDeviceData(String email) throws ParseException, MessagingException {
         List<DeviceDetectionVO> detectionAll = new ArrayList<>();
 
         List<Device> allDevice = deviceDao.findAllByEmail(email);
@@ -74,10 +92,15 @@ public class DeviceDetectionServiceImpl implements DeviceDetectionService {
                 long start = format.parse(detectionVO.getStartTime()).getTime();
                 detectionVO.setUseTime((System.currentTimeMillis() - start) / 1000 / 60);
                 detectionVO.setIsError(detectionVO.getUseTime() > Integer.parseInt(detectionVO.getReportThreshold()));
-                //过滤存储新的数据
-                if (detectionVO.getIsError()) {
-                    //TODO 发送邮件告诉
-                }
+                //报警处理
+                executorService.execute(() -> {
+                    try {
+                        doAlarm(detectionVO, email);
+                    } catch (MessagingException e) {
+                        log.error("发送邮件错误");
+                    }
+                });
+
             }
         }
         redisDao.setDeviceDataByEmail(email, JSON.toJSON(detectionAll).toString());
@@ -86,7 +109,7 @@ public class DeviceDetectionServiceImpl implements DeviceDetectionService {
     }
 
     @Override
-    public Response<Boolean> operateDevice(String email, Integer deviceId, Integer status) throws ParseException {
+    public Response<Boolean> operateDevice(String email, Integer deviceId, Integer status) throws ParseException, MessagingException {
 
         String deviceDataStr = redisDao.getDeviceDataByEmail(email);
 
@@ -94,7 +117,7 @@ public class DeviceDetectionServiceImpl implements DeviceDetectionService {
         for (DeviceDetectionVO detectionVO : oldDetectionVOS) {
             if (detectionVO.getId().equals(deviceId)) {
                 if (status == 0) {
-                    log.info("close device,name={}", detectionVO.getNameAndArea());
+                    log.info("close device,name={}", detectionVO.getName());
                     //关闭
                     if (detectionVO.getStatus() == 1) {
                         detectionVO.setStatus(0);
@@ -104,13 +127,19 @@ public class DeviceDetectionServiceImpl implements DeviceDetectionService {
                         detectionVO.setUseTime((end - start) / 1000 / 60);
                         detectionVO.setIsError(detectionVO.getUseTime() > Integer.parseInt(detectionVO.getReportThreshold()));
                     }
-                    if (detectionVO.getIsError()) {
-                        //TODO 发送邮件告诉
-                    }
-                    //TODO 上报历史记录
+                    //报警处理
+                    executorService.execute(() -> {
+                        try {
+                            doAlarm(detectionVO, email);
+                        } catch (MessagingException e) {
+                            log.error("发送邮件错误");
+                        }
+                    });
+
+                    deviceHistoryService.addHistoryData(buildHistory(detectionVO, email));
                 } else {
                     //打开
-                    log.info("open device,name={}", detectionVO.getNameAndArea());
+                    log.info("open device,name={}", detectionVO.getName());
                     if (detectionVO.getStatus() == 0) {
                         detectionVO.setStatus(1);
                         detectionVO.setStartTime(format.format(System.currentTimeMillis()));
@@ -124,4 +153,40 @@ public class DeviceDetectionServiceImpl implements DeviceDetectionService {
         redisDao.setDeviceDataByEmail(email, JSON.toJSON(oldDetectionVOS).toString());
         return new Response<>(true);
     }
+
+    private void doAlarm(DeviceDetectionVO detectionVO, String email) throws MessagingException {
+        if (detectionVO.getIsError()) {
+            Integer val = alarmMap.getOrDefault(detectionVO.getId(), 0);
+            if (val % 10 == 0) {
+                mailService.sendAlarmMail(email, ALARM_MAIL_TITLE, buildAlarmContent(detectionVO));
+            }
+            alarmMap.put(detectionVO.getId(), val + 1);
+            log.info("alarm val={}", val);
+        } else {
+            alarmMap.remove(detectionVO.getId());
+        }
+
+    }
+
+    private String buildAlarmContent(DeviceDetectionVO detectionVO) {
+        return ALARM_MAIL_DEVICE_CONTENT + "\n设备名:" + detectionVO.getName() + "\n" +
+            "设备区域:" + detectionVO.getArea() + "\n" +
+            "设备使用时间:" + detectionVO.getUseTime() + "\n" +
+            "设备报警阈值:" + detectionVO.getReportThreshold() + "\n";
+    }
+
+    private DeviceHistory buildHistory(DeviceDetectionVO detectionVO, String email) {
+
+        return DeviceHistory.builder()
+            .area(detectionVO.getArea())
+            .createTime(new Date())
+            .email(email)
+            .endTime(detectionVO.getEndTime())
+            .startTime(detectionVO.getStartTime())
+            .name(detectionVO.getName())
+            .status(detectionVO.getIsError() ? 0 : 1)
+            .useTime(detectionVO.getUseTime().intValue()).build();
+    }
+
+
 }

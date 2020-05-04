@@ -38,4 +38,16 @@ public class MailServiceImpl implements MailService {
         mailSender.send(mimeMessage);
         log.info("send mail success,to={}", to);
     }
+
+    @Override
+    public void sendAlarmMail(String to, String title, String content) throws MessagingException {
+        MimeMessage mimeMessage = mailSender.createMimeMessage();
+        MimeMessageHelper messageHelper = new MimeMessageHelper(mimeMessage,true,"UTF-8");
+        messageHelper.setFrom(from);
+        messageHelper.setTo(to);
+        messageHelper.setSubject(title);
+        messageHelper.setText(content);
+        mailSender.send(mimeMessage);
+        log.info("send mail success,to={}", to);
+    }
 }

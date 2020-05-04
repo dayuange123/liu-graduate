@@ -6,28 +6,18 @@ package com.ljy.graduate.util;
  * Description:
  */
 public interface Constants {
-    // 手写文字识别webapi接口地址
-    String WEBOCR_URL = "https://webapi.xfyun.cn/v1/service/v1/ocr/handwriting";
-    // 应用APPID(必须为webapi类型应用,并开通手写文字识别服务,参考帖子如何创建一个webapi应用：http://bbs.xfyun.cn/forum.php?mod=viewthread&tid=36481)
-    String TEST_APPID = "5e7752a2";
-    // 接口密钥(webapi类型应用开通手写文字识别后，控制台--我的应用---手写文字识别---相应服务的apikey)
-    String TEST_API_KEY = "0cfbc1d01db56f17b5aaafb1daa60e08";
-    String FILE_BASE_PATH = "/home/deploy/";
-    /**
-     * 校验阈值
-     */
-    Float CONFIDENCE_THRESHOLD = 0.9F;
+
+
 
     interface UserConstants {
         String REGISTER_MAIL_TITLE = "智能家居系统账户激活邮件";
-
-
+        String ALARM_MAIL_TITLE = "报警邮件";
+        String ALARM_MAIL_DEVICE_CONTENT = "家庭设备报警,详细内容:";
+        String ALARM_MAIL_ENVIRONMENT_CONTENT = "家庭环境报警,详细内容:";
 
     }
 
-    Integer cycleSizeMax=1000;
-
-
-    Integer BASE_C_NUMBER=300000;
+    String HOST_PORT="47.106.112.29:8011";
+   // String HOST_PORT="localhost:8011";
 
 }

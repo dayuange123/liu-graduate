@@ -4,6 +4,7 @@ import com.ljy.graduate.bean.DeviceDetectionVO;
 import com.ljy.graduate.bean.EnvironmentDetectionVO;
 import com.ljy.graduate.common.Response;
 
+import javax.mail.MessagingException;
 import java.util.List;
 
 /**
@@ -14,6 +15,6 @@ import java.util.List;
 public interface EnvironmentDetectionService {
     Response<List<EnvironmentDetectionVO>> getAllData(String email);
 
-    void changeEnvironmentData();
+    void changeEnvironmentData() throws MessagingException;
 
 }

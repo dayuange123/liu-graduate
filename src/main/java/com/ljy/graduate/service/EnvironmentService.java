@@ -18,4 +18,6 @@ public interface EnvironmentService {
     Response<List<EnvironmentVO>> getAllDevice(String email);
 
     void deleteEnvironment(String email, Integer id);
+
+    Integer getEnvironmentCount(String email);
 }

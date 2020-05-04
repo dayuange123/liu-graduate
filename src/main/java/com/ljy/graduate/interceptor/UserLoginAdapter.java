@@ -25,9 +25,12 @@ public class UserLoginAdapter implements WebMvcConfigurer{
 		registry.addInterceptor(userLoginInterceptor).addPathPatterns("/**")
 			.excludePathPatterns("/me/css/**","/me/js/**","/me/images/**")//排除样式、脚本、图片等资源文件
 			.excludePathPatterns("/css/**","/js/**","/images/**")//排除样式、脚本、图片等资源文件
-			.excludePathPatterns("/me/lyear_pages_login.html")//排除登录页面
-			.excludePathPatterns("/user/login");//排除用户点击登录按钮
-		 
+			.excludePathPatterns("/me/login.html")//排除登录页面
+			.excludePathPatterns("/me/register.html")//排除登录页面
+			.excludePathPatterns("/user/login")//排除用户点击登录按钮
+			.excludePathPatterns("/user/register")//排除用户点击登录按钮
+			.excludePathPatterns("/user/activateUser");//排除用户点击登录按钮
+
 	}
 	 
 }

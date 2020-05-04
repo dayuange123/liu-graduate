@@ -62,4 +62,9 @@ public class EnvironmentServiceImpl implements EnvironmentService {
     public void deleteEnvironment(String email, Integer id) {
         environmentDao.deleteById(id);
     }
+
+    @Override
+    public Integer getEnvironmentCount(String email) {
+        return environmentDao.countByEmail(email);
+    }
 }

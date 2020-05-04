@@ -11,10 +11,13 @@ public interface MailService {
 
     /**
      * 发送邮件
+     *
      * @param to
      * @param title
      * @param content
      */
     void sendVerifyMail(String to, String title, String content) throws MessagingException;
+
+    void sendAlarmMail(String to, String title, String content) throws MessagingException;
 
 }
